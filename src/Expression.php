@@ -3,6 +3,7 @@
 namespace Viloveul\Query\Search;
 
 use Doctrine\DBAL\Connection;
+use Psr\SimpleCache\CacheInterface;
 use Viloveul\Query\Search\Parameter;
 use Viloveul\Query\Search\ParameterInterface;
 
@@ -86,24 +87,15 @@ class Expression implements ExpressionInterface
     private $tprefix = 'tprefix_';
 
     /**
-     * @param Connection $connection
-     * @param string     $sql
+     * @param string         $sql
+     * @param Connection     $connection
+     * @param CacheInterface $cache
      */
-    public function __construct(Connection $connection, string $sql)
+    public function __construct(string $sql, Connection $connection, CacheInterface $cache = null)
     {
         $this->connection = $connection;
-
-        if (stripos($sql, 'file://') === 0) {
-            $fname = substr($sql, 7);
-
-            if (is_file($fname)) {
-                $this->query = preg_replace('/\s+/', ' ', file_get_contents($fname));
-            }
-
-        } else {
-            $this->query = preg_replace('/\s+/', ' ', $sql);
-        }
-
+        $this->cache = $cache;
+        $this->query = preg_replace('/\s+/', ' ', $this->load($sql));
     }
 
     /**
@@ -199,18 +191,7 @@ class Expression implements ExpressionInterface
      */
     public function withCount(string $sql): void
     {
-
-        if (stripos($sql, 'file://') === 0) {
-            $fname = substr($sql, 7);
-
-            if (is_file($fname)) {
-                $this->counter = preg_replace('/\s+/', ' ', file_get_contents($fname));
-            }
-
-        } else {
-            $this->counter = preg_replace('/\s+/', ' ', $sql);
-        }
-
+        $this->counter = preg_replace('/\s+/', ' ', $this->load($sql));
     }
 
     /**
@@ -219,20 +200,11 @@ class Expression implements ExpressionInterface
     public function withFilter($filterable): void
     {
 
-        if ($filterable !== null) {
-
-            if (is_string($filterable) && stripos($filterable, 'file://') === 0) {
-                $fname = substr($filterable, 7);
-
-                if (is_file($fname)) {
-                    $this->filterable = json_decode(file_get_contents($fname), true);
-                }
-
-            } else {
-                $this->filterable = is_array($filterable) ? $filterable : (array) $filterable;
-            }
-
+        if (is_string($filterable)) {
+            $filterable = json_decode($this->load($filterable), true);
         }
+
+        $this->filterable = is_array($filterable) ? $filterable : (array) $filterable;
 
     }
 
@@ -242,20 +214,11 @@ class Expression implements ExpressionInterface
     public function withOrder($sortable): void
     {
 
-        if ($sortable !== null) {
-
-            if (is_string($sortable) && stripos($sortable, 'file://') === 0) {
-                $fname = substr($sortable, 7);
-
-                if (is_file($fname)) {
-                    $this->sortable = json_decode(file_get_contents($fname), true);
-                }
-
-            } else {
-                $this->sortable = is_array($sortable) ? $sortable : (array) $sortable;
-            }
-
+        if (is_string($sortable)) {
+            $sortable = json_decode($this->load($sortable), true);
         }
+
+        $this->sortable = is_array($sortable) ? $sortable : (array) $sortable;
 
     }
 
@@ -297,6 +260,36 @@ class Expression implements ExpressionInterface
     }
 
     /**
+     * @param  string  $name
+     * @return mixed
+     */
+    protected function load(string $name)
+    {
+
+        if ($this->cache !== null && $this->cache->has($name)) {
+            return $this->cache->get($name);
+        }
+
+        $sql = $name;
+
+        if (stripos($sql, 'file://') === 0) {
+            $fname = substr($sql, 7);
+
+            if (is_file($fname)) {
+                $sql = file_get_contents($fname);
+
+                if ($this->cache !== null) {
+                    $this->cache->set($name, $sql);
+                }
+
+            }
+
+        }
+
+        return $sql;
+    }
+
+    /**
      * @return void
      */
     protected function parseCondition(): void
@@ -335,16 +328,19 @@ class Expression implements ExpressionInterface
                                 }
 
                                 $clause = substr_replace($clause,
-                                    '(' . implode(', ', array_fill(0, count($ar), '?')) . ')',
+                                    'IN (' . implode(', ', array_fill(0, count($ar), '?')) . ')',
                                     $pos,
                                     $len
                                 );
                                 break;
                             case '%':
                                 $this->bindings[] = '%' . preg_replace('/\s+/', '%', strtolower($this->filters[$name])) . '%';
-                                $clause = substr_replace($clause, '?', $pos, $len);
+                                $clause = substr_replace($clause, 'LIKE ?', $pos, $len);
                                 break;
                             case '=':
+                                $this->bindings[] = $this->filters[$name];
+                                $clause = substr_replace($clause, '= ?', $pos, $len);
+                                break;
                             default:
                                 $this->bindings[] = $this->filters[$name];
                                 $clause = substr_replace($clause, '?', $pos, $len);

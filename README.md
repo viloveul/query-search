@@ -12,12 +12,12 @@ $filter = [
   'tbl.name = {bar}'
 ];
 
-$search = new Viloveul\Search\Expression($doctrine, $query);
+$search = new Viloveul\Query\Search\Expression($query, $doctrine);
 $search->withPrefix('your_table_prefix_');
 $search->withCount($count);
 $search->withFilter($filter);
 $search->withOrder($sort);
-$search->withParameter(new Viloveul\Search\Parameter($_GET));
+$search->withParameter(new Viloveul\Query\Search\Parameter($_GET));
 $search->execute();
 
 $data = $search->getData();
