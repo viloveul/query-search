@@ -158,7 +158,7 @@ class Expression implements ExpressionInterface
         $parameter = $this->parameter;
 
         if ($parameter === null) {
-            $parameter = new Parameter(isset($_POST) ? $_POST : (isset($_GET) ? $_GET : []));
+            $parameter = new Parameter($_GET ?: []);
         }
 
         $this->page = $parameter->getPage();
