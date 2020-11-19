@@ -84,7 +84,7 @@ class Expression implements ExpressionInterface
     /**
      * @var mixed
      */
-    private $tprefix = 'tprefix_';
+    private $prefix = 'prefix_';
 
     /**
      * @param string         $sql
@@ -235,7 +235,7 @@ class Expression implements ExpressionInterface
      */
     public function withPrefix(string $prefix): void
     {
-        $this->tprefix = $prefix;
+        $this->prefix = $prefix;
     }
 
     /**
@@ -244,7 +244,7 @@ class Expression implements ExpressionInterface
      */
     protected function build(string $sql): string
     {
-        $query = str_replace('tprefix_', $this->tprefix, $sql);
+        $query = str_replace('prefix_', $this->prefix, $sql);
 
         if ($this->conditions === null) {
             return $query;
