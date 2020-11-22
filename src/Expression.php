@@ -2,10 +2,10 @@
 
 namespace Viloveul\Query\Search;
 
-use Doctrine\DBAL\Connection;
 use Psr\SimpleCache\CacheInterface;
 use Viloveul\Query\Search\Parameter;
 use Viloveul\Query\Search\ParameterInterface;
+use Viloveul\Query\Search\ConnectionInterface;
 
 class Expression implements ExpressionInterface
 {
@@ -64,6 +64,11 @@ class Expression implements ExpressionInterface
     /**
      * @var mixed
      */
+    private $prefix = 'prefix_';
+
+    /**
+     * @var mixed
+     */
     private $query = null;
 
     /**
@@ -82,16 +87,11 @@ class Expression implements ExpressionInterface
     private $total = 0;
 
     /**
-     * @var mixed
+     * @param string              $sql
+     * @param ConnectionInterface $connection
+     * @param CacheInterface      $cache
      */
-    private $prefix = 'prefix_';
-
-    /**
-     * @param string         $sql
-     * @param Connection     $connection
-     * @param CacheInterface $cache
-     */
-    public function __construct(string $sql, Connection $connection, CacheInterface $cache = null)
+    public function __construct(string $sql, ConnectionInterface $connection, CacheInterface $cache = null)
     {
         $this->connection = $connection;
         $this->cache = $cache;
@@ -132,7 +132,7 @@ class Expression implements ExpressionInterface
             }
 
             if ($this->size !== 0) {
-                $query = $this->connection->getDatabasePlatform()->modifyLimitQuery(
+                $query = $this->connection->compileLimit(
                     $query, $this->size, ($this->page * $this->size) - $this->size
                 );
             }
@@ -149,6 +149,26 @@ class Expression implements ExpressionInterface
 
                 return $result;
             }, $data);
+        }
+
+    }
+
+    /**
+     * @param $config
+     */
+    public function configure($config): void
+    {
+
+        if (is_string($config)) {
+            $config = json_decode($this->load($config), true) ?: [];
+        }
+
+        if (array_key_exists('where', $config)) {
+            $this->filterable = is_array($config['where']) ? $config['where'] : (array) $config['where'];
+        }
+
+        if (array_key_exists('order', $config)) {
+            $this->sortable = is_array($config['order']) ? $config['order'] : (array) $config['order'];
         }
 
     }
@@ -192,34 +212,6 @@ class Expression implements ExpressionInterface
     public function withCount(string $sql): void
     {
         $this->counter = preg_replace('/\s+/', ' ', $this->load($sql));
-    }
-
-    /**
-     * @param $filterable
-     */
-    public function withFilter($filterable): void
-    {
-
-        if (is_string($filterable)) {
-            $filterable = json_decode($this->load($filterable), true);
-        }
-
-        $this->filterable = is_array($filterable) ? $filterable : (array) $filterable;
-
-    }
-
-    /**
-     * @param $sortable
-     */
-    public function withOrder($sortable): void
-    {
-
-        if (is_string($sortable)) {
-            $sortable = json_decode($this->load($sortable), true);
-        }
-
-        $this->sortable = is_array($sortable) ? $sortable : (array) $sortable;
-
     }
 
     /**
