@@ -10,6 +10,12 @@ interface ExpressionInterface
     public function compile(): void;
 
     /**
+     * @param  $configure
+     * @return void
+     */
+    public function configure($configure): void;
+
+    /**
      * @return void
      */
     public function execute(): void;
@@ -29,18 +35,6 @@ interface ExpressionInterface
      * @return void
      */
     public function withCount(string $sql): void;
-
-    /**
-     * @param  $filterable
-     * @return void
-     */
-    public function withFilter($filterable): void;
-
-    /**
-     * @param  $sortable
-     * @return void
-     */
-    public function withOrder($sortable): void;
 
     /**
      * @param  ParameterInterface $parameter

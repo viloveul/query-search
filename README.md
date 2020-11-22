@@ -1,23 +1,24 @@
 # Search Expression 
 
 ```php
-$query = 'SELECT * FROM tprefix_tbl /* where condition */';
-$count = 'SELECT count(*) from tprefix_tbl /* where condition */';
-$order = [
-  'foo' => 'tbl.your',
-  'bar' => 'tbl.name'
+$query = 'SELECT * FROM prefix_tbl /* where condition */';
+$count = 'SELECT count(*) from prefix_tbl /* where condition */';
+$config = [
+	'order' => [
+		'foo' => 'tbl.your',
+		'bar' => 'tbl.name'
+	],
+	'filter' => [
+		'tbl.your like {%foo}',
+		'tbl.name = {bar}'
+	]
 ];
-$filter = [
-  'tbl.your like {%foo}',
-  'tbl.name = {bar}'
-];
-
-$search = new Viloveul\Query\Search\Expression($query, $doctrine);
+$connection = new Viloveul\Query\Search\DoctrineConnection($doctrine);
+$search = new Viloveul\Query\Search\Expression($query, $connection);
+$search->withParameter(new Viloveul\Query\Search\Parameter($_GET));
 $search->withPrefix('your_table_prefix_');
 $search->withCount($count);
-$search->withFilter($filter);
-$search->withOrder($sort);
-$search->withParameter(new Viloveul\Query\Search\Parameter($_GET));
+$search->configure($config);
 $search->execute();
 
 $data = $search->getData();
