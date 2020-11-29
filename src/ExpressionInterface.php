@@ -2,6 +2,8 @@
 
 namespace Viloveul\Query\Search;
 
+use Closure;
+
 interface ExpressionInterface
 {
     /**
@@ -29,6 +31,11 @@ interface ExpressionInterface
      * @return int
      */
     public function getTotal(): int;
+
+    /**
+     * @param Closure $listener
+     */
+    public function listen(Closure $listener): void;
 
     /**
      * @param  string $sql
