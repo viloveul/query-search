@@ -2,6 +2,7 @@
 
 namespace Viloveul\Query\Search;
 
+use Closure;
 use Psr\SimpleCache\CacheInterface;
 use Viloveul\Query\Search\Parameter;
 use Viloveul\Query\Search\ParameterInterface;
@@ -45,6 +46,11 @@ class Expression implements ExpressionInterface
      * @var array
      */
     private $filters = [];
+
+    /**
+     * @var mixed
+     */
+    private $listeners = [];
 
     /**
      * @var array
@@ -105,9 +111,10 @@ class Expression implements ExpressionInterface
     {
 
         if ($this->counter !== null) {
-            $this->total = $this->connection->fetchColumn(
-                $this->build($this->counter), $this->bindings, 0
-            );
+            $cstart = microtime(true);
+            $cquery = $this->build($this->counter);
+            $this->total = $this->connection->fetchColumn($cquery, $this->bindings, 0);
+            $this->fireEventListener($cquery, $cstart);
 
             if ($this->size === 0) {
                 $this->size = 15;
@@ -116,6 +123,7 @@ class Expression implements ExpressionInterface
         }
 
         if ($this->total > 0 || $this->counter === null) {
+            $start = microtime(true);
             $query = $this->build($this->query);
             $orders = [];
 
@@ -138,6 +146,7 @@ class Expression implements ExpressionInterface
             }
 
             $data = $this->connection->fetchAll($query, $this->bindings);
+            $this->fireEventListener($cquery, $cstart);
 
             $this->data = array_map(function ($row) {
                 $result = new \stdClass();
@@ -206,6 +215,14 @@ class Expression implements ExpressionInterface
     }
 
     /**
+     * @param Closure $handler
+     */
+    public function listen(Closure $handler): void
+    {
+        $this->listeners[] = $handler;
+    }
+
+    /**
      * @param  string $sql
      * @return void
      */
@@ -239,7 +256,7 @@ class Expression implements ExpressionInterface
         $query = str_replace('prefix_', $this->prefix, $sql);
 
         if ($this->conditions === null) {
-            return $query;
+            return preg_replace('/\/\*\s+(where|and|or|on)\scondition\s+\*\//i', '', $query);
         }
 
         return preg_replace_callback(
@@ -249,6 +266,14 @@ class Expression implements ExpressionInterface
             },
             $query
         );
+    }
+
+    /**
+     * @param $start
+     */
+    protected function getElapsedTime($start)
+    {
+        return round((microtime(true) - $start) * 1000, 2);
     }
 
     /**
@@ -354,6 +379,20 @@ class Expression implements ExpressionInterface
 
         if ($conditions) {
             $this->conditions = '(' . implode(' AND ', $conditions) . ')';
+        }
+
+    }
+
+    /**
+     * @param string   $query
+     * @param $start
+     */
+    private function fireEventListener(string $query, $start)
+    {
+        $time = $this->getElapsedTime($start);
+
+        foreach ($this->listeners as $handler) {
+            $handler($query, $this->bindings, $time);
         }
 
     }
